@@ -981,7 +981,15 @@ function txKey(year, month) {
   return `tx_${year}-${String(month+1).padStart(2,'0')}`;
 }
 function getMonthTx(year, month) {
-  return DB.load(txKey(year, month), []);
+
+  if(year === undefined || month === undefined) {
+    const now = new Date();
+
+    year = now.getFullYear();
+    month = now.getMonth();
+  }
+
+  return DB.load(txKey(year, month), []) || [];
 }
 function saveMonthTx(year, month, data) {
   DB.save(txKey(year, month), data);
@@ -1146,7 +1154,12 @@ const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out'
 
 let txType = 'receita';
 let currentFilter = 'all';
-let viewYear, viewMonth;
+
+const now = new Date();
+
+let viewYear = now.getFullYear();
+let viewMonth = now.getMonth();
+
 let currentPage = 'dashboard';
 let charts = {};
 
@@ -1161,15 +1174,64 @@ function fmtShort(n){ return 'R$ '+fmt(n); }
 /* ─────────────────────────────────────────────────
    MONTH NAVIGATION
    ───────────────────────────────────────────────── */
-function changeMonth(dir) {
-  viewMonth += dir;
-  if(viewMonth > 11){ viewMonth = 0; viewYear++; }
-  if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+function changeMonth(direction) {
+
+  if(viewMonth === undefined || viewYear === undefined) {
+
+    const now = new Date();
+
+    viewMonth = now.getMonth();
+    viewYear = now.getFullYear();
+  }
+
+  viewMonth += direction;
+
+  if(viewMonth > 11) {
+    viewMonth = 0;
+    viewYear++;
+  }
+
+  if(viewMonth < 0) {
+    viewMonth = 11;
+    viewYear--;
+  }
+
   updateMonthLabel();
-  refreshCurrentPage();
+
+  renderDashboard();
+  renderTransacoesPage();
+  renderRelatoriosPage();
 }
 function updateMonthLabel() {
-  document.getElementById('month-label').textContent = MONTH_NAMES[viewMonth] + ' ' + viewYear;
+
+  const months = [
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez'
+  ];
+
+  if(viewMonth === undefined || viewYear === undefined) {
+
+    const now = new Date();
+
+    viewMonth = now.getMonth();
+    viewYear = now.getFullYear();
+  }
+
+  const label = document.getElementById('month-label');
+
+  if(label) {
+    label.textContent = `${months[viewMonth]} ${viewYear}`;
+  }
 }
 function refreshCurrentPage() {
   if(currentPage === 'transacoes') renderTransacoesPage();
@@ -1599,26 +1661,55 @@ function setType(t){
   document.getElementById('btn-rec').className='type-btn'+(t==='receita'?' active-rec':'');
   document.getElementById('btn-exp').className='type-btn'+(t==='despesa'?' active-exp':'');
 }
-function saveTransaction(){
-  const desc=document.getElementById('f-desc').value.trim();
-  const val=parseFloat(document.getElementById('f-val').value);
-  const date=document.getElementById('f-data').value;
-  const cat=document.getElementById('f-cat').value;
-  if(!desc||!val||!date){showToast('⚠ Preencha todos os campos');return;}
-  // detect month from date
-  const d = new Date(date+'T12:00:00');
-  const y = d.getFullYear(), m = d.getMonth();
-  const txs = getMonthTx(y, m);
-  const tx = {id:Date.now(),type:txType,desc,val,cat,date,icon:catIcons[cat]||'📦'};
-  txs.unshift(tx);
-  saveMonthTx(y, m, txs);
+function saveTransaction() {
+
+  if(viewYear === undefined || viewMonth === undefined) {
+
+    const now = new Date();
+
+    viewYear = now.getFullYear();
+    viewMonth = now.getMonth();
+  }
+
+  const desc = document.getElementById('f-desc').value;
+  const val  = parseFloat(document.getElementById('f-val').value);
+  const data = document.getElementById('f-data').value;
+  const cat  = document.getElementById('f-cat').value;
+
+  if(!desc || !val || !data) {
+    showToast('Preencha todos os campos');
+    return;
+  }
+
+  const txDate = new Date(data);
+
+  const txYear  = txDate.getFullYear();
+  const txMonth = txDate.getMonth();
+
+  const tx = {
+    id: Date.now(),
+    desc,
+    val,
+    data,
+    cat,
+    type: txType
+  };
+
+  const list = getMonthTx(txYear, txMonth);
+
+  list.unshift(tx);
+
+  saveMonthTx(txYear, txMonth, list);
+
   closeModal();
-  document.getElementById('f-desc').value='';
-  document.getElementById('f-val').value='';
-  showToast(`✓ ${txType==='receita'?'Receita':'Despesa'} de R$ ${fmt(val)} salva!`);
-  refreshCurrentPage();
-  if(currentPage !== 'dashboard') renderDashboard(); // keep metrics fresh
-  else renderDashboard();
+
+  renderDashboard();
+  renderTransacoesPage();
+  renderRelatoriosPage();
+
+  updateMonthLabel();
+
+  showToast('Transação salva!');
 }
 
 /* ─────────────────────────────────────────────────
@@ -1762,7 +1853,22 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelec
   if(saved) {
     try {
       const { user, token } = JSON.parse(saved);
-      if(user && token) { await _startSession(user, token); return; }
+     if(user && token) {
+
+  const now = new Date();
+
+  viewYear = now.getFullYear();
+  viewMonth = now.getMonth();
+
+  await _startSession(user, token);
+
+  updateMonthLabel();
+
+  renderDashboard();
+  renderTransacoesPage();
+
+  return;
+}
     } catch(e){}
   }
   // sem sessão → tela de login já visível
