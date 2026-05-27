@@ -1137,6 +1137,15 @@ function authLogout() {
    INIT
    ───────────────────────────────────────────────── */
 
+/* ─────────────────────────────────────────────────
+   STATE
+   ───────────────────────────────────────────────── */
+const catIcons  = {salario:'💼',freelance:'💻',moradia:'🏠',alimentacao:'🍽️',transporte:'🚗',saude:'❤️',lazer:'🎮',educacao:'📚',outros:'📦'};
+const catColors = {salario:'#34d399',freelance:'#22d3ee',moradia:'#c6f135',alimentacao:'#22d3ee',transporte:'#818cf8',saude:'#fb7185',lazer:'#fbbf24',educacao:'#a78bfa',outros:'#6b7280'};
+const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+let txType = 'receita';
+let currentFilter = 'all';
 let viewYear, viewMonth;
 let currentPage = 'dashboard';
 let charts = {};
