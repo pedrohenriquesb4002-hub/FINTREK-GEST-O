@@ -1040,10 +1040,19 @@ function authSwitchTab(tab) {
   document.getElementById('reg-error').textContent   = '';
 }
 
-async function login(){
+async function authLogin(){
 
   const email = document.getElementById('login-email').value;
-  const senha = document.getElementById('login-password').value;
+  const senha = document.getElementById('login-pass').value;
+
+  const errEl = document.getElementById('login-error');
+
+  if(!email || !senha){
+    errEl.textContent = 'Preencha email e senha.';
+    return;
+  }
+
+  errEl.textContent = 'Entrando...';
 
   try{
 
@@ -1053,26 +1062,26 @@ async function login(){
         'Content-Type':'application/json'
       },
       body: JSON.stringify({
+        action: 'login',
         email,
-        senha
+        pass: senha
       })
     });
 
     const data = await response.json();
 
-    if(!response.ok){
-      alert(data.error || 'Erro ao logar');
+    if(!response.ok || !data.ok){
+      errEl.textContent = data.err || data.error || 'Erro ao logar';
       return;
     }
 
-    localStorage.setItem('token', data.token);
+    await _startSession(data.user, data.token);
 
-    alert('Login realizado!');
-    window.location.href = '/';
+    errEl.textContent = '';
 
   }catch(err){
     console.error(err);
-    alert('Erro de conexão');
+    errEl.textContent = 'Erro de conexão com servidor.';
   }
 }
 
