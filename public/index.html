@@ -29,6 +29,25 @@
   --sans:     'DM Sans', sans-serif;
   --display:  'Syne', sans-serif;
 }
+[data-theme="light"] {
+  --bg:       #f0f4f8;
+  --bg1:      #ffffff;
+  --bg2:      #f7f9fc;
+  --bg3:      #edf1f7;
+  --border:   rgba(0,0,0,.08);
+  --border2:  rgba(0,0,0,.15);
+  --text:     #0f172a;
+  --text2:    #475569;
+  --text3:    #94a3b8;
+  --lime:     #5c9e00;
+  --lime2:    #4a8000;
+  --cyan:     #0891b2;
+  --violet:   #6366f1;
+  --rose:     #e11d48;
+  --amber:    #d97706;
+  --green:    #059669;
+}
+
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -725,9 +744,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
             <div class="config-item">
               <div class="config-item-left">
                 <div class="config-item-icon">🌙</div>
-                <div class="config-item-info"><div class="ci-label">Modo escuro</div><div class="ci-desc">Ativado por padrão</div></div>
+                <div class="config-item-info"><div class="ci-label">Modo escuro</div><div class="ci-desc" id="theme-desc">Ativado</div></div>
               </div>
-              <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+              <div class="toggle on" id="toggle-theme" onclick="toggleTheme(this)"></div>
             </div>
           </div>
         </div>
@@ -745,6 +764,30 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
             </div>
           </div>
           <button class="btn-save" onclick="saveProfile()">Salvar Perfil</button>
+        </div>
+
+        <!-- Importar Extrato -->
+        <div class="card" style="margin-top:16px;">
+          <div class="card-header">
+            <div><div class="card-title">📄 Importar Extrato Bancário</div><div class="card-sub">Cole o extrato, selecione a conta e importe automaticamente</div></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Conta de destino</label>
+            <select class="form-select" id="extrato-conta-sel"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cole o extrato aqui (qualquer formato — uma linha por transação)</label>
+            <textarea class="form-input" id="extrato-texto" rows="7" placeholder="Exemplos aceitos:
+10/05/2025  Pix João Silva         -R$ 150,00
+2025-05-12  Salário empresa         5.000,00
+15/05  Mercado Extra              -320,50
+Recebido de Maria (Pix)   +200,00"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button class="btn-primary" onclick="previewExtrato()">👁 Pré-visualizar</button>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--text3);align-self:center">Revise antes de importar</span>
+          </div>
+          <div id="extrato-preview" style="margin-top:14px;"></div>
         </div>
       </div>
 
@@ -901,6 +944,50 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 </div>
 
 <div class="toast" id="toast"><div class="toast-dot"></div><span id="toast-msg">Salvo!</span></div>
+
+<!-- ═══ MODAL: NOVA CATEGORIA ═══ -->
+<div class="modal-overlay" id="modal-cat">
+  <div class="modal">
+    <div class="modal-title">➕ Nova Categoria</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="new-cat-emoji" placeholder="📌" maxlength="2" value="📌">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nome (sem espaços)</label>
+        <input class="form-input" id="new-cat-nome" placeholder="Ex: trufas, vendas, pets">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeCatModal()">Cancelar</button>
+      <button class="btn-save" onclick="saveCustomCat()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: EDITAR CONTA / VINCULAR DESPESA ═══ -->
+<div class="modal-overlay" id="modal-edit-conta">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title">✏ Editar Conta</div>
+    <div style="font-family:var(--mono);font-size:14px;color:var(--text1);margin-bottom:4px" id="ec-nome"></div>
+    <div style="font-size:22px;font-weight:700;color:var(--lime);margin-bottom:16px" id="ec-saldo"></div>
+    <div class="form-group">
+      <label class="form-label">Atualizar saldo manualmente (R$)</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="ec-novo-saldo" type="number" placeholder="Novo saldo" step="0.01">
+        <button class="btn-save" style="white-space:nowrap" onclick="saveContaSaldo()">Salvar</button>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:16px">
+      <label class="form-label">Descontar despesa do saldo — clique em "+ Adicionar"</label>
+      <div id="ec-tx-list" style="max-height:240px;overflow-y:auto;margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeEditContaModal()">Fechar</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- ═══════════════════════════════════════════════
@@ -1079,10 +1166,18 @@ async function authLogin(){
 
     errEl.textContent = '';
 
-  } catch(err) {
-    console.error('AUTH ERROR COMPLETO:', err);
-    errEl.textContent = 'Erro de conexão. Tente novamente.';
-  }
+  }catch (err) {
+
+  console.error('AUTH ERROR COMPLETO:', err);
+
+  return res.status(500).json({
+    ok: false,
+    err: err.message,
+    detail: err.detail || null,
+    stack: err.stack || null
+  });
+
+}
 }
 
 async function authRegister() {
@@ -1127,7 +1222,16 @@ async function _startSession(user, token) {
   document.getElementById('sb-email').textContent  = user.email;
 
   authScreen.classList.add('hidden');
-  init();
+
+  // inicializa navegação
+  viewYear  = new Date().getFullYear();
+  viewMonth = new Date().getMonth();
+  refreshCatMaps();
+  applyTheme();
+  updateMonthLabel();
+  seedIfEmpty();
+  renderDashboard();
+  renderTransacoesPage();
 }
 
 function authLogout() {
@@ -1174,8 +1278,42 @@ function authLogout() {
 /* ─────────────────────────────────────────────────
    STATE
    ───────────────────────────────────────────────── */
-const catIcons  = {salario:'💼',freelance:'💻',moradia:'🏠',alimentacao:'🍽️',transporte:'🚗',saude:'❤️',lazer:'🎮',educacao:'📚',outros:'📦'};
-const catColors = {salario:'#34d399',freelance:'#22d3ee',moradia:'#c6f135',alimentacao:'#22d3ee',transporte:'#818cf8',saude:'#fb7185',lazer:'#fbbf24',educacao:'#a78bfa',outros:'#6b7280'};
+const DEFAULT_CATS = {salario:'💼',freelance:'💻',moradia:'🏠',alimentacao:'🍽️',transporte:'🚗',saude:'❤️',lazer:'🎮',educacao:'📚',outros:'📦'};
+const DEFAULT_COLORS = {salario:'#34d399',freelance:'#22d3ee',moradia:'#c6f135',alimentacao:'#22d3ee',transporte:'#818cf8',saude:'#fb7185',lazer:'#fbbf24',educacao:'#a78bfa',outros:'#6b7280'};
+const EXTRA_COLORS = ['#f97316','#06b6d4','#d946ef','#10b981','#eab308','#3b82f6','#ef4444','#84cc16'];
+
+function getCustomCats() { return DB.load('custom_cats', []); }
+
+function getCatIcons() {
+  const custom = getCustomCats();
+  const icons = {...DEFAULT_CATS};
+  custom.forEach(c => { icons[c.key] = c.emoji; });
+  return icons;
+}
+function getCatColors() {
+  const custom = getCustomCats();
+  const colors = {...DEFAULT_COLORS};
+  custom.forEach((c, i) => { colors[c.key] = EXTRA_COLORS[i % EXTRA_COLORS.length]; });
+  return colors;
+}
+
+// mantém catIcons/catColors como getters dinâmicos para compatibilidade
+let catIcons  = DEFAULT_CATS;
+let catColors = DEFAULT_COLORS;
+function refreshCatMaps() {
+  catIcons  = getCatIcons();
+  catColors = getCatColors();
+}
+
+function populateCatSelects() {
+  refreshCatMaps();
+  const allCats = Object.entries(catIcons).map(([k,v]) => `<option value="${k}">${v} ${k}</option>`).join('');
+  const despCats = Object.entries(catIcons)
+    .filter(([k]) => !['salario','freelance'].includes(k))
+    .map(([k,v]) => `<option value="${k}">${v} ${k}</option>`).join('');
+  ['f-cat'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=allCats; });
+  ['b-cat'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=despCats; });
+}
 const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 let txType = 'receita';
@@ -1530,21 +1668,29 @@ function renderRelatoriosPage() {
    CATEGORIAS PAGE
    ───────────────────────────────────────────────── */
 function renderCategoriasPage() {
+  refreshCatMaps();
   const all = getAllTransactions();
+  const custom = getCustomCats();
   const cats = Object.keys(catIcons);
   const html = cats.map(cat => {
     const txs = all.filter(t => t.cat === cat);
     const despesas = txs.filter(t=>t.type==='despesa').reduce((s,t)=>s+t.val,0);
     const receitas = txs.filter(t=>t.type==='receita').reduce((s,t)=>s+t.val,0);
-    const total = cat === 'salario' || cat === 'freelance' ? receitas : despesas;
     const isRec = cat === 'salario' || cat === 'freelance';
+    const total = isRec ? receitas : despesas;
+    const isCustom = custom.some(c=>c.key===cat);
     return `<div class="cat-card">
       <div class="cat-emoji">${catIcons[cat]}</div>
       <div class="cat-name">${cat}</div>
       <div class="cat-count">${txs.length} transações</div>
       <div class="cat-total ${isRec?'pos':'neg'}">${isRec?'+':'-'} R$ ${fmt(total)}</div>
+      ${isCustom ? `<button class="tx-del" style="margin-top:6px;font-size:10px;padding:2px 6px;" onclick="deleteCustomCat('${cat}')">✕ remover</button>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + `<div class="cat-card" style="cursor:pointer;border:1px dashed var(--border);background:transparent;" onclick="openCatModal()">
+    <div class="cat-emoji">➕</div>
+    <div class="cat-name">Nova</div>
+    <div class="cat-count">categoria</div>
+  </div>`;
   document.getElementById('cat-grid').innerHTML = html;
   buildCatTrendChart();
 }
@@ -1559,7 +1705,10 @@ function renderContasPage() {
       <div class="conta-type">${c.tipo.toUpperCase()}</div>
       <div class="conta-bank"><span class="conta-emoji">${c.emoji}</span>${c.nome}</div>
       <div class="conta-saldo">R$ ${fmt(c.saldo)}</div>
-      <div class="conta-delta" style="color:var(--green)">✓ Ativo</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn-primary" style="flex:1;padding:6px;font-size:11px" onclick="openEditContaModal(${c.id})">✏ Editar / Vincular</button>
+        <button class="tx-del" style="padding:6px 10px" onclick="deleteConta(${c.id})">✕</button>
+      </div>
     </div>`).join('') +
     `<div class="conta-add-card" onclick="openContaModal()"><div style="font-size:28px;color:var(--text3)">+</div><span>Nova Conta</span></div>`;
 
@@ -1589,6 +1738,10 @@ function renderConfigPage() {
     <div class="data-stat"><div class="ds-val">${monthKeys.length}</div><div class="ds-label">Meses</div></div>
     <div class="data-stat"><div class="ds-val">${goals.length}</div><div class="ds-label">Metas</div></div>
     <div class="data-stat"><div class="ds-val">R$ ${fmt(totalSaldo)}</div><div class="ds-label">Patrimônio</div></div>`;
+  // sync toggle com tema atual
+  applyTheme();
+  // popula select de contas no extrato
+  populateExtratoContaSel();
 }
 
 /* ─────────────────────────────────────────────────
@@ -1619,14 +1772,15 @@ function buildFluxoChart() {
 
 function buildCategChart(txs) {
   destroyChart('categ');
-  const cats=['moradia','alimentacao','transporte','saude','lazer','educacao','outros'];
-  const vals = cats.map(c => txs.filter(t=>t.cat===c&&t.type==='despesa').reduce((s,t)=>s+t.val,0));
-  const cols=['#c6f135','#22d3ee','#818cf8','#fb7185','#fbbf24','#a78bfa','#6b7280'];
+  refreshCatMaps();
+  const cats = Object.keys(catIcons).filter(c => !['salario','freelance'].includes(c));
+  const vals  = cats.map(c => txs.filter(t=>t.cat===c&&t.type==='despesa').reduce((s,t)=>s+t.val,0));
+  const cols  = cats.map(c => catColors[c] || '#6b7280');
   // legend
-  document.getElementById('categ-legend').innerHTML = cats.filter((_,i)=>vals[i]>0).slice(0,3).map((c,i) => {
-    const realI = cats.indexOf(c);
-    return `<div class="mini-stat"><div class="ms-dot" style="background:${cols[realI]}"></div><div class="ms-label">${catIcons[c]} ${c}</div><div class="ms-val">R$ ${fmt(vals[realI])}</div></div>`;
-  }).join('');
+  const paired = cats.map((c,i)=>({c,v:vals[i],col:cols[i]})).filter(x=>x.v>0).slice(0,3);
+  document.getElementById('categ-legend').innerHTML = paired.map(x =>
+    `<div class="mini-stat"><div class="ms-dot" style="background:${x.col}"></div><div class="ms-label">${catIcons[x.c]} ${x.c}</div><div class="ms-val">R$ ${fmt(x.v)}</div></div>`
+  ).join('');
   const ctx = document.getElementById('chartCateg').getContext('2d');
   charts['categ'] = new Chart(ctx,{type:'doughnut',data:{labels:cats,datasets:[{data:vals,backgroundColor:cols,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: R$ ${fmt(c.raw)}`}}}}});
 }
@@ -1680,7 +1834,7 @@ function buildContasChart(contas, colors) {
    MODAL: TRANSAÇÃO
    ───────────────────────────────────────────────── */
 let modalOpen=false;
-function openModal(){document.getElementById('modal').classList.add('open');modalOpen=true;}
+function openModal(){ populateCatSelects(); document.getElementById('modal').classList.add('open'); modalOpen=true; }
 function closeModal(){document.getElementById('modal').classList.remove('open');modalOpen=false;}
 function setType(t){
   txType=t;
@@ -1716,7 +1870,7 @@ function saveTransaction() {
     id: Date.now(),
     desc,
     val,
-    data,
+    date: data,
     cat,
     type: txType
   };
@@ -1741,7 +1895,7 @@ function saveTransaction() {
 /* ─────────────────────────────────────────────────
    MODAL: ORÇAMENTO
    ───────────────────────────────────────────────── */
-function openBudgetModal(){document.getElementById('modal-budget').classList.add('open');}
+function openBudgetModal(){ populateCatSelects(); document.getElementById('modal-budget').classList.add('open'); }
 function closeBudgetModal(){document.getElementById('modal-budget').classList.remove('open');}
 function saveBudget(){
   const cat=document.getElementById('b-cat').value;
@@ -1784,7 +1938,89 @@ function saveGoal(){
 /* ─────────────────────────────────────────────────
    MODAL: CONTA
    ───────────────────────────────────────────────── */
-function openContaModal(){document.getElementById('modal-conta').classList.add('open');}
+function openCatModal() { document.getElementById('modal-cat').classList.add('open'); }
+function closeCatModal() {
+  document.getElementById('modal-cat').classList.remove('open');
+  document.getElementById('new-cat-nome').value = '';
+  document.getElementById('new-cat-emoji').value = '';
+}
+function saveCustomCat() {
+  const nome  = document.getElementById('new-cat-nome').value.trim().toLowerCase().replace(/\s+/g,'_');
+  const emoji = document.getElementById('new-cat-emoji').value.trim() || '📌';
+  if(!nome) { showToast('⚠ Informe o nome'); return; }
+  if(catIcons[nome]) { showToast('⚠ Já existe'); return; }
+  const custom = getCustomCats();
+  custom.push({ key: nome, emoji });
+  DB.save('custom_cats', custom);
+  closeCatModal();
+  refreshCatMaps();
+  renderCategoriasPage();
+  showToast(`✓ Categoria "${nome}" criada!`);
+}
+function deleteCustomCat(key) {
+  if(!confirm(`Remover categoria "${key}"?`)) return;
+  const custom = getCustomCats().filter(c=>c.key!==key);
+  DB.save('custom_cats', custom);
+  refreshCatMaps();
+  renderCategoriasPage();
+  showToast('🗑 Categoria removida');
+}
+
+/* ── CONTA: editar saldo e vincular despesas ── */
+let _editContaId = null;
+
+function openEditContaModal(id) {
+  const contas = DB.load('contas', []);
+  const c = contas.find(x=>x.id===id);
+  if(!c) return;
+  _editContaId = id;
+  document.getElementById('ec-nome').textContent  = `${c.emoji} ${c.nome}`;
+  document.getElementById('ec-saldo').textContent = `R$ ${fmt(c.saldo)}`;
+  document.getElementById('ec-novo-saldo').value  = '';
+
+  // lista transações do mês para vincular
+  const txs = getMonthTx(viewYear, viewMonth).filter(t=>t.type==='despesa');
+  document.getElementById('ec-tx-list').innerHTML = txs.length ? txs.map(t =>
+    `<div class="tx-item" style="cursor:pointer" onclick="linkTxToConta(${t.id},'${txKey(viewYear,viewMonth)}')">
+      <div class="tx-icon" style="background:rgba(251,113,133,.12)">${catIcons[t.cat]||'📦'}</div>
+      <div class="tx-info"><div class="tx-name">${t.desc}</div><div class="tx-date">${t.date||t.data||''}</div></div>
+      <div class="tx-amount neg">- R$ ${fmt(t.val)}</div>
+      <button class="btn-primary" style="padding:4px 10px;font-size:11px;margin-left:8px">+ Adicionar</button>
+    </div>`).join('') :
+    '<div style="color:var(--text3);font-size:12px;font-family:var(--mono);padding:16px;text-align:center">Nenhuma despesa este mês</div>';
+
+  document.getElementById('modal-edit-conta').classList.add('open');
+}
+function closeEditContaModal() {
+  document.getElementById('modal-edit-conta').classList.remove('open');
+  _editContaId = null;
+}
+function saveContaSaldo() {
+  const novo = parseFloat(document.getElementById('ec-novo-saldo').value);
+  if(isNaN(novo)) { showToast('⚠ Informe o novo saldo'); return; }
+  const contas = DB.load('contas', []);
+  const c = contas.find(x=>x.id===_editContaId);
+  if(!c) return;
+  c.saldo = novo;
+  DB.save('contas', contas);
+  closeEditContaModal();
+  renderContasPage();
+  showToast('✓ Saldo atualizado!');
+}
+function linkTxToConta(txId, key) {
+  const txs = DB.load(key, []);
+  const t = txs.find(x=>x.id===txId);
+  if(!t) return;
+  const contas = DB.load('contas', []);
+  const c = contas.find(x=>x.id===_editContaId);
+  if(!c) return;
+  if(!confirm(`Descontar R$ ${fmt(t.val)} de "${c.nome}"?\nSaldo atual: R$ ${fmt(c.saldo)}`)) return;
+  c.saldo = Math.max(0, c.saldo - t.val);
+  DB.save('contas', contas);
+  closeEditContaModal();
+  renderContasPage();
+  showToast(`✓ R$ ${fmt(t.val)} descontado de ${c.nome}`);
+}
 function closeContaModal(){document.getElementById('modal-conta').classList.remove('open');}
 function saveConta(){
   const nome=document.getElementById('c-nome').value.trim();
@@ -1801,6 +2037,14 @@ function saveConta(){
   renderContasPage();
   showToast('✓ Conta adicionada!');
 }
+function deleteConta(id) {
+  if(!confirm('Remover esta conta?')) return;
+  let contas = DB.load('contas', []);
+  contas = contas.filter(c=>c.id!==id);
+  DB.save('contas', contas);
+  renderContasPage();
+  showToast('🗑 Conta removida');
+}
 
 /* ─────────────────────────────────────────────────
    PROFILE & MISC
@@ -1811,6 +2055,208 @@ function saveProfile(){
   DB.save('profile',{nome,email});
   if(nome) document.querySelector('.user-info .un').textContent=nome;
   showToast('✓ Perfil salvo!');
+}
+
+/* ── TEMA ── */
+function toggleTheme(btn) {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if(isLight) {
+    document.documentElement.removeAttribute('data-theme');
+    btn.classList.add('on');
+    document.getElementById('theme-desc').textContent = 'Ativado';
+    DB.save('theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    btn.classList.remove('on');
+    document.getElementById('theme-desc').textContent = 'Desativado';
+    DB.save('theme', 'light');
+  }
+}
+function applyTheme() {
+  const t = DB.load('theme', 'dark');
+  if(t === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    const btn = document.getElementById('toggle-theme');
+    if(btn) { btn.classList.remove('on'); }
+    const desc = document.getElementById('theme-desc');
+    if(desc) desc.textContent = 'Desativado';
+  }
+}
+
+/* ── EXTRATO BANCÁRIO ── */
+function populateExtratoContaSel() {
+  const contas = DB.load('contas', []);
+  const sel = document.getElementById('extrato-conta-sel');
+  if(!sel) return;
+  sel.innerHTML = contas.length
+    ? contas.map(c=>`<option value="${c.id}">${c.emoji} ${c.nome}</option>`).join('')
+    : '<option value="">— Nenhuma conta cadastrada —</option>';
+}
+
+function parseExtratoLine(line) {
+  // tenta extrair data, descrição e valor de qualquer formato
+  const valor_re = /[-+]?\s*R?\$?\s*([\d.,]+)/gi;
+  const data_re  = /(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/;
+
+  line = line.trim();
+  if(!line) return null;
+
+  // extrai todos os números do tipo valor
+  const nums = [];
+  let m;
+  while((m = valor_re.exec(line)) !== null) {
+    const raw = m[1].replace(/\./g,'').replace(',','.');
+    const n = parseFloat(raw);
+    if(!isNaN(n) && n > 0) nums.push({val:n, idx:m.index, raw:m[0]});
+  }
+  if(!nums.length) return null;
+
+  // pega o maior número como valor (geralmente o montante)
+  const maior = nums.reduce((a,b)=>b.val>a.val?b:a);
+  const val = maior.val;
+
+  // detecta sinal — se tem '-' ou 'débito'/'deb' antes do valor → despesa
+  const antes = line.substring(0, maior.idx).toLowerCase();
+  const sinalNeg = antes.includes('-') || /déb|deb|pgto|pagto|pag\b|saída|saida|compra/.test(antes) || /[-]/.test(maior.raw);
+  const sinalPos = /cred|dep|receb|pix rec|salário|salario|entrada/.test(antes);
+  const tipo = sinalPos ? 'receita' : (sinalNeg ? 'despesa' : 'despesa');
+
+  // extrai data
+  const dm = data_re.exec(line);
+  let date = new Date().toISOString().slice(0,10);
+  if(dm) {
+    let d=parseInt(dm[1]), mo=parseInt(dm[2]), y=dm[3]?parseInt(dm[3]):new Date().getFullYear();
+    if(y<100) y+=2000;
+    // se dia > 12 garante ordem correta
+    if(d>12&&mo<=12) { date=`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+    else { date=`${y}-${String(d).padStart(2,'0')}-${String(mo).padStart(2,'0')}`; }
+  }
+
+  // descrição = tira data, valor, símbolos
+  let desc = line
+    .replace(data_re,'')
+    .replace(/[-+]?\s*R?\$?\s*[\d.,]+/g,'')
+    .replace(/[*|]/g,' ')
+    .replace(/\s{2,}/g,' ')
+    .trim() || 'Transação importada';
+
+  // detecta categoria pela descrição
+  const dl = desc.toLowerCase();
+  let cat = 'outros';
+  if(/salário|salario|holerite/.test(dl))             cat='salario';
+  else if(/mercado|supermer|aliment|restaur|ifood|lanche|padaria/.test(dl)) cat='alimentacao';
+  else if(/aluguel|condo|iptu|luz|agua|energia|gas|internet|telefone/.test(dl)) cat='moradia';
+  else if(/uber|99|combustível|gasolina|onibus|metrô|pedágio|posto/.test(dl)) cat='transporte';
+  else if(/farm|drog|médico|hospital|plano|saúde|exame/.test(dl)) cat='saude';
+  else if(/netflix|spotify|cinema|lazer|jogo|game/.test(dl)) cat='lazer';
+  else if(/curso|escola|facul|livro|educ/.test(dl)) cat='educacao';
+  else if(/freelance|serviço|projeto/.test(dl)) cat='freelance';
+
+  return { date, desc, val, tipo, cat };
+}
+
+function previewExtrato() {
+  const texto = document.getElementById('extrato-texto').value;
+  const contaId = parseInt(document.getElementById('extrato-conta-sel').value);
+  const contas = DB.load('contas', []);
+  const conta = contas.find(c=>c.id===contaId);
+
+  const linhas = texto.split('\n');
+  const parsed = linhas.map(parseExtratoLine).filter(Boolean);
+
+  if(!parsed.length) {
+    document.getElementById('extrato-preview').innerHTML =
+      '<div style="color:var(--rose);font-family:var(--mono);font-size:12px;padding:12px">⚠ Nenhuma transação reconhecida. Verifique o formato.</div>';
+    return;
+  }
+
+  const total_desp = parsed.filter(t=>t.tipo==='despesa').reduce((s,t)=>s+t.val,0);
+  const total_rec  = parsed.filter(t=>t.tipo==='receita').reduce((s,t)=>s+t.val,0);
+
+  const rows = parsed.map((t,i) => `
+    <div class="tx-item" style="padding:8px 10px">
+      <div class="tx-icon" style="background:${t.tipo==='receita'?'rgba(52,211,153,.12)':'rgba(251,113,133,.12)'}">
+        ${catIcons[t.cat]||'📦'}
+      </div>
+      <div class="tx-info">
+        <div class="tx-name">${t.desc} <span class="tx-cat">${t.cat}</span></div>
+        <div class="tx-date">${t.date}</div>
+      </div>
+      <div class="tx-amount ${t.tipo==='receita'?'pos':'neg'}">${t.tipo==='receita'?'+':'-'} R$ ${fmt(t.val)}</div>
+      <button class="tx-del" onclick="removeExtratoItem(${i})" title="Remover">✕</button>
+    </div>`).join('');
+
+  document.getElementById('extrato-preview').innerHTML = `
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:10px;display:flex;gap:20px">
+      <span>${parsed.length} transações encontradas</span>
+      <span style="color:var(--green)">↑ Receitas R$ ${fmt(total_rec)}</span>
+      <span style="color:var(--rose)">↓ Despesas R$ ${fmt(total_desp)}</span>
+    </div>
+    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">${rows}</div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+      <button class="btn-primary" onclick="importarExtrato()">✓ Importar ${parsed.length} transações</button>
+      ${conta ? `<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">→ conta: ${conta.emoji} ${conta.nome} · saldo será descontado</span>` : ''}
+    </div>`;
+
+  window._extratoCache = { parsed, contaId };
+}
+
+function removeExtratoItem(i) {
+  if(!window._extratoCache) return;
+  window._extratoCache.parsed.splice(i,1);
+  // reconstrói preview sem re-parsear
+  const { parsed, contaId } = window._extratoCache;
+  const contas = DB.load('contas',[]);
+  const conta = contas.find(c=>c.id===contaId);
+  if(!parsed.length){ document.getElementById('extrato-preview').innerHTML=''; return; }
+  const total_desp = parsed.filter(t=>t.tipo==='despesa').reduce((s,t)=>s+t.val,0);
+  const total_rec  = parsed.filter(t=>t.tipo==='receita').reduce((s,t)=>s+t.val,0);
+  const rows = parsed.map((t,i)=>`
+    <div class="tx-item" style="padding:8px 10px">
+      <div class="tx-icon" style="background:${t.tipo==='receita'?'rgba(52,211,153,.12)':'rgba(251,113,133,.12)'}">${catIcons[t.cat]||'📦'}</div>
+      <div class="tx-info"><div class="tx-name">${t.desc} <span class="tx-cat">${t.cat}</span></div><div class="tx-date">${t.date}</div></div>
+      <div class="tx-amount ${t.tipo==='receita'?'pos':'neg'}">${t.tipo==='receita'?'+':'-'} R$ ${fmt(t.val)}</div>
+      <button class="tx-del" onclick="removeExtratoItem(${i})">✕</button>
+    </div>`).join('');
+  document.getElementById('extrato-preview').innerHTML=`
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:10px;display:flex;gap:20px">
+      <span>${parsed.length} transações</span>
+      <span style="color:var(--green)">↑ R$ ${fmt(total_rec)}</span>
+      <span style="color:var(--rose)">↓ R$ ${fmt(total_desp)}</span>
+    </div>
+    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">${rows}</div>
+    <div style="margin-top:12px"><button class="btn-primary" onclick="importarExtrato()">✓ Importar ${parsed.length} transações</button></div>`;
+}
+
+function importarExtrato() {
+  if(!window._extratoCache) return;
+  const { parsed, contaId } = window._extratoCache;
+  const contas = DB.load('contas', []);
+  const conta = contas.find(c=>c.id===contaId);
+
+  let totalDesc = 0;
+  parsed.forEach(t => {
+    const d = new Date(t.date);
+    const y = d.getFullYear(), mo = d.getMonth();
+    const list = getMonthTx(y, mo);
+    list.unshift({ id: Date.now() + Math.random(), desc: t.desc, val: t.val, date: t.date, cat: t.cat, type: t.tipo });
+    saveMonthTx(y, mo, list);
+    if(t.tipo === 'despesa') totalDesc += t.val;
+  });
+
+  // atualiza saldo da conta
+  if(conta) {
+    conta.saldo = Math.max(0, conta.saldo - totalDesc);
+    DB.save('contas', contas);
+  }
+
+  document.getElementById('extrato-preview').innerHTML =
+    `<div style="color:var(--green);font-family:var(--mono);font-size:12px;padding:12px">✓ ${parsed.length} transações importadas!${conta?' Saldo de '+conta.nome+' atualizado.':''}</div>`;
+  document.getElementById('extrato-texto').value = '';
+  window._extratoCache = null;
+  renderDashboard();
+  renderTransacoesPage();
+  showToast(`✓ ${parsed.length} transações importadas!`);
 }
 
 function showNeonInfo(){
