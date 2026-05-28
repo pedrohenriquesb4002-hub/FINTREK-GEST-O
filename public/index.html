@@ -975,7 +975,7 @@ async function _apiDelete(key) {
 }
 
 /* ─────────────────────────────────────────────────
-  MONTHLY STORAGE
+   MONTHLY STORAGE
    ───────────────────────────────────────────────── */
 function txKey(year, month) {
   return `tx_${year}-${String(month+1).padStart(2,'0')}`;
@@ -1002,7 +1002,7 @@ function getAllTransactions() {
 }
 
 /* ─────────────────────────────────────────────────
-  SEED DATA (apenas na primeira vez do usuário)
+   SEED DATA (apenas na primeira vez do usuário)
    ───────────────────────────────────────────────── */
 function seedIfEmpty() {
   const now = new Date();
@@ -1029,7 +1029,7 @@ function seedIfEmpty() {
 }
 
 /* ─────────────────────────────────────────────────
-  AUTH UI
+   AUTH UI
    ───────────────────────────────────────────────── */
 function authSwitchTab(tab) {
   document.getElementById('panel-login').style.display    = tab==='login'    ? '' : 'none';
@@ -1079,18 +1079,10 @@ async function authLogin(){
 
     errEl.textContent = '';
 
-  }catch (err) {
-
-  console.error('AUTH ERROR COMPLETO:', err);
-
-  return res.status(500).json({
-    ok: false,
-    err: err.message,
-    detail: err.detail || null,
-    stack: err.stack || null
-  });
-
-}
+  } catch(err) {
+    console.error('AUTH ERROR COMPLETO:', err);
+    errEl.textContent = 'Erro de conexão. Tente novamente.';
+  }
 }
 
 async function authRegister() {
