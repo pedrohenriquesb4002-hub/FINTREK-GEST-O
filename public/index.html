@@ -15,7 +15,7 @@
   --bg3:      #161e2a;
   --border:   rgba(255,255,255,.06);
   --border2:  rgba(255,255,255,.1);
-  --text:     #e8edf5fd;
+  --text:     #e8edf5;
   --text2:    #7a8a9e;
   --text3:    #3d4e60;
   --lime:     #c6f135;
@@ -769,20 +769,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
         <!-- Importar Extrato -->
         <div class="card" style="margin-top:16px;">
           <div class="card-header">
-            <div><div class="card-title">📄 Importar Extrato OFX</div><div class="card-sub">Arquivo .ofx exportado pelo seu banco — leitura automática</div></div>
+            <div><div class="card-title">📄 Importar Extrato Bancário</div><div class="card-sub">Cole o extrato, selecione a conta e importe automaticamente</div></div>
           </div>
           <div class="form-group">
             <label class="form-label">Conta de destino</label>
             <select class="form-select" id="extrato-conta-sel"></select>
           </div>
           <div class="form-group">
-            <label class="form-label">Arquivo OFX</label>
-            <label id="ofx-dropzone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px;border:2px dashed var(--border2);border-radius:12px;cursor:pointer;transition:border-color .2s;background:var(--bg3)">
-              <span style="font-size:32px">📂</span>
-              <span style="font-family:var(--mono);font-size:12px;color:var(--text2)">Clique ou arraste o arquivo .ofx aqui</span>
-              <span id="ofx-filename" style="font-family:var(--mono);font-size:11px;color:var(--text3)">Nenhum arquivo selecionado</span>
-              <input type="file" id="ofx-input" accept=".ofx,.qfx,.ofc" style="display:none" onchange="handleOFXFile(this)">
-            </label>
+            <label class="form-label">Cole o extrato aqui (qualquer formato — uma linha por transação)</label>
+            <textarea class="form-input" id="extrato-texto" rows="7" placeholder="Exemplos aceitos:
+10/05/2025  Pix João Silva         -R$ 150,00
+2025-05-12  Salário empresa         5.000,00
+15/05  Mercado Extra              -320,50
+Recebido de Maria (Pix)   +200,00"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px;">
+            <button class="btn-primary" onclick="previewExtrato()">👁 Pré-visualizar</button>
+            <span style="font-size:11px;font-family:var(--mono);color:var(--text3);align-self:center">Revise antes de importar</span>
           </div>
           <div id="extrato-preview" style="margin-top:14px;"></div>
         </div>
@@ -1086,31 +1089,6 @@ function getAllTransactions() {
 }
 
 /* ─────────────────────────────────────────────────
-   SEED DATA (apenas na primeira vez do usuário)
-   ───────────────────────────────────────────────── */
-function seedIfEmpty() {
-  const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  if(getMonthTx(y, m).length) return;
-  const seed = [
-    {id:1,type:'receita',desc:'Salário',val:8500,cat:'salario',date:`${y}-${String(m+1).padStart(2,'0')}-01`,icon:'💼'},
-    {id:2,type:'despesa',desc:'Aluguel',val:1800,cat:'moradia',date:`${y}-${String(m+1).padStart(2,'0')}-03`,icon:'🏠'},
-    {id:3,type:'despesa',desc:'Supermercado',val:380,cat:'alimentacao',date:`${y}-${String(m+1).padStart(2,'0')}-05`,icon:'🍽️'},
-    {id:4,type:'receita',desc:'Freelance Design',val:2200,cat:'freelance',date:`${y}-${String(m+1).padStart(2,'0')}-08`,icon:'💻'},
-    {id:5,type:'despesa',desc:'Combustível',val:280,cat:'transporte',date:`${y}-${String(m+1).padStart(2,'0')}-10`,icon:'🚗'},
-    {id:6,type:'despesa',desc:'Plano de Saúde',val:180,cat:'saude',date:`${y}-${String(m+1).padStart(2,'0')}-12`,icon:'❤️'},
-    {id:7,type:'receita',desc:'Renda Extra',val:950,cat:'outros',date:`${y}-${String(m+1).padStart(2,'0')}-15`,icon:'📦'},
-    {id:8,type:'despesa',desc:'Restaurante',val:145,cat:'alimentacao',date:`${y}-${String(m+1).padStart(2,'0')}-18`,icon:'🍽️'},
-    {id:9,type:'despesa',desc:'Netflix',val:85,cat:'lazer',date:`${y}-${String(m+1).padStart(2,'0')}-20`,icon:'🎮'},
-    {id:10,type:'despesa',desc:'Curso Online',val:197,cat:'educacao',date:`${y}-${String(m+1).padStart(2,'0')}-22`,icon:'📚'},
-  ];
-  saveMonthTx(y, m, seed);
-  const pm = m===0?11:m-1, py = m===0?y-1:y;
-  if(!getMonthTx(py,pm).length){
-    const seed2=seed.map(t=>({...t,id:t.id+100,date:t.date.replace(`${y}-${String(m+1).padStart(2,'0')}`,`${py}-${String(pm+1).padStart(2,'0')}`),val:Math.round(t.val*(0.85+Math.random()*0.3))}));
-    saveMonthTx(py,pm,seed2);
-  }
-}
 
 /* ─────────────────────────────────────────────────
    AUTH UI
@@ -1226,7 +1204,6 @@ async function _startSession(user, token) {
   refreshCatMaps();
   applyTheme();
   updateMonthLabel();
-  seedIfEmpty();
   renderDashboard();
   renderTransacoesPage();
 }
@@ -2091,180 +2068,7 @@ function populateExtratoContaSel() {
     : '<option value="">— Nenhuma conta cadastrada —</option>';
 }
 
-/* ── OFX PARSER ── */
-function handleOFXFile(input) {
-  const file = input.files[0];
-  if(!file) return;
-  document.getElementById('ofx-filename').textContent = file.name;
-  document.getElementById('ofx-dropzone').style.borderColor = 'var(--lime)';
-
-  const reader = new FileReader();
-  reader.onload = e => parseOFX(e.target.result);
-  reader.readAsText(e => parseOFX(e.target.result));
-  reader.readAsText(file, 'latin1'); // bancos BR geralmente usam latin1
-}
-
-function parseOFX(raw) {
-  // normaliza quebras de linha e trata tanto SGML quanto XML
-  const txt = raw.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-
-  // extrai blocos <STMTTRN>...</STMTTRN> ou <STMTTRN> sem fechamento (SGML)
-  const txBlocks = [];
-  const xmlRe = /<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi;
-  let m;
-  while((m = xmlRe.exec(txt)) !== null) txBlocks.push(m[1]);
-
-  // fallback SGML: divide por <STMTTRN> sem tag de fechamento
-  if(!txBlocks.length) {
-    const parts = txt.split(/<STMTTRN>/i);
-    parts.slice(1).forEach(p => txBlocks.push(p.split(/<\/STMTTRNLIST>|<STMTTRN>/i)[0]));
-  }
-
-  if(!txBlocks.length) {
-    document.getElementById('extrato-preview').innerHTML =
-      '<div style="color:var(--rose);font-family:var(--mono);font-size:12px;padding:12px">⚠ Nenhuma transação encontrada no arquivo. Verifique se é um .ofx válido.</div>';
-    return;
-  }
-
-  function tag(block, name) {
-    const re = new RegExp('<' + name + '>([^<\\n]+)', 'i');
-    const m = re.exec(block);
-    return m ? m[1].trim() : '';
-  }
-
-  const parsed = txBlocks.map(block => {
-    const trntype = tag(block, 'TRNTYPE').toUpperCase();
-    const dtraw   = tag(block, 'DTPOSTED') || tag(block, 'DTUSER');
-    const amtraw  = tag(block, 'TRNAMT');
-    const memo    = tag(block, 'MEMO') || tag(block, 'NAME') || 'Transação';
-    const nome    = tag(block, 'NAME') || '';
-
-    // valor
-    const val = Math.abs(parseFloat(amtraw.replace(',','.'))) || 0;
-    if(!val) return null;
-
-    // tipo: CREDIT/DEP/INT/DIV = receita; o resto = despesa
-    const isCredit = /^(CREDIT|DEP|INT|DIV|DIRECTDEP)$/i.test(trntype) || parseFloat(amtraw) > 0;
-    const tipo = isCredit ? 'receita' : 'despesa';
-
-    // data: OFX usa YYYYMMDDHHMMSS ou YYYYMMDD
-    let date = new Date().toISOString().slice(0,10);
-    if(dtraw.length >= 8) {
-      const y  = dtraw.slice(0,4);
-      const mo = dtraw.slice(4,6);
-      const d  = dtraw.slice(6,8);
-      date = `${y}-${mo}-${d}`;
-    }
-
-    // descrição: combina MEMO + NAME sem duplicar
-    let desc = memo;
-    if(nome && !memo.toLowerCase().includes(nome.toLowerCase())) desc = nome + (memo ? ' — ' + memo : '');
-    desc = desc.replace(/\s{2,}/g,' ').trim() || 'Transação importada';
-
-    // categoria automática
-    const dl = desc.toLowerCase();
-    let cat = 'outros';
-    if(/salário|salario|holerite|folha/.test(dl))                              cat='salario';
-    else if(/mercado|supermer|aliment|restaur|ifood|lanche|padaria|food/.test(dl)) cat='alimentacao';
-    else if(/aluguel|condo|iptu|luz|agua|energia|gas\b|internet|telefone|tim|claro|vivo/.test(dl)) cat='moradia';
-    else if(/uber|99|combustív|gasolina|onibus|metrô|metro|pedágio|posto|shell|ipiranga/.test(dl)) cat='transporte';
-    else if(/farm|drog|médico|medico|hospital|plano|saúde|saude|exame|unimed|hapvida/.test(dl)) cat='saude';
-    else if(/netflix|spotify|cinema|lazer|jogo|game|steam|amazon prime/.test(dl)) cat='lazer';
-    else if(/curso|escola|facul|livro|educ|udemy|alura/.test(dl))              cat='educacao';
-    else if(/freelance|serviço|servico|projeto/.test(dl))                      cat='freelance';
-
-    return { date, desc, val, tipo, cat };
-  }).filter(Boolean);
-
-  if(!parsed.length) {
-    document.getElementById('extrato-preview').innerHTML =
-      '<div style="color:var(--rose);font-family:var(--mono);font-size:12px;padding:12px">⚠ Arquivo lido mas nenhuma transação válida encontrada.</div>';
-    return;
-  }
-
-  const contaId = parseInt(document.getElementById('extrato-conta-sel').value);
-  window._extratoCache = { parsed, contaId };
-  renderExtratoPreview();
-}
-
-function renderExtratoPreview() {
-  const { parsed, contaId } = window._extratoCache;
-  const contas = DB.load('contas', []);
-  const conta = contas.find(c=>c.id===contaId);
-  const total_desp = parsed.filter(t=>t.tipo==='despesa').reduce((s,t)=>s+t.val,0);
-  const total_rec  = parsed.filter(t=>t.tipo==='receita').reduce((s,t)=>s+t.val,0);
-
-  const rows = parsed.map((t,i) => `
-    <div class="tx-item" style="padding:8px 10px">
-      <div class="tx-icon" style="background:${t.tipo==='receita'?'rgba(52,211,153,.12)':'rgba(251,113,133,.12)'}">
-        ${catIcons[t.cat]||'📦'}
-      </div>
-      <div class="tx-info">
-        <div class="tx-name">${t.desc} <span class="tx-cat">${t.cat}</span></div>
-        <div class="tx-date">${t.date}</div>
-      </div>
-      <div class="tx-amount ${t.tipo==='receita'?'pos':'neg'}">${t.tipo==='receita'?'+':'-'} R$ ${fmt(t.val)}</div>
-      <button class="tx-del" onclick="removeExtratoItem(${i})" title="Remover">✕</button>
-    </div>`).join('');
-
-  document.getElementById('extrato-preview').innerHTML = `
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-bottom:10px;display:flex;gap:20px;flex-wrap:wrap">
-      <span>📋 ${parsed.length} transações lidas</span>
-      <span style="color:var(--green)">↑ Receitas R$ ${fmt(total_rec)}</span>
-      <span style="color:var(--rose)">↓ Despesas R$ ${fmt(total_desp)}</span>
-    </div>
-    <div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">${rows}</div>
-    <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn-primary" onclick="importarExtrato()">✓ Importar ${parsed.length} transações</button>
-      ${conta ? `<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">→ ${conta.emoji} ${conta.nome} · saldo será atualizado</span>` : ''}
-    </div>`;
-}
-
-function removeExtratoItem(i) {
-  if(!window._extratoCache) return;
-  window._extratoCache.parsed.splice(i, 1);
-  if(!window._extratoCache.parsed.length) {
-    document.getElementById('extrato-preview').innerHTML = '';
-    return;
-  }
-  renderExtratoPreview();
-}
-
-function importarExtrato() {
-  if(!window._extratoCache) return;
-  const { parsed, contaId } = window._extratoCache;
-  const contas = DB.load('contas', []);
-  const conta = contas.find(c=>c.id===contaId);
-
-  let totalDesp = 0, totalRec = 0;
-  parsed.forEach(t => {
-    const d  = new Date(t.date + 'T12:00:00');
-    const y  = d.getFullYear(), mo = d.getMonth();
-    const list = getMonthTx(y, mo);
-    list.unshift({ id: Date.now() + Math.random(), desc: t.desc, val: t.val, date: t.date, cat: t.cat, type: t.tipo });
-    saveMonthTx(y, mo, list);
-    if(t.tipo === 'despesa') totalDesp += t.val;
-    else totalRec += t.val;
-  });
-
-  // atualiza saldo: soma receitas, subtrai despesas
-  if(conta) {
-    conta.saldo = Math.max(0, conta.saldo + totalRec - totalDesp);
-    DB.save('contas', contas);
-  }
-
-  document.getElementById('extrato-preview').innerHTML =
-    `<div style="color:var(--green);font-family:var(--mono);font-size:12px;padding:12px">
-      ✓ ${parsed.length} transações importadas!${conta ? ' Saldo de ' + conta.emoji + ' ' + conta.nome + ' atualizado.' : ''}
-    </div>`;
-  document.getElementById('ofx-filename').textContent = 'Nenhum arquivo selecionado';
-  document.getElementById('ofx-dropzone').style.borderColor = '';
-  document.getElementById('ofx-input').value = '';
-  window._extratoCache = null;
-  renderDashboard();
-  renderTransacoesPage();
-  showToast(`✓ ${parsed.length} transações importadas!`);
-}
+function parseExtratoLine(line) {
   // tenta extrair data, descrição e valor de qualquer formato
   const valor_re = /[-+]?\s*R?\$?\s*([\d.,]+)/gi;
   const data_re  = /(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/;
@@ -2324,7 +2128,7 @@ function importarExtrato() {
   else if(/freelance|serviço|projeto/.test(dl)) cat='freelance';
 
   return { date, desc, val, tipo, cat };
-
+}
 
 function previewExtrato() {
   const texto = document.getElementById('extrato-texto').value;
