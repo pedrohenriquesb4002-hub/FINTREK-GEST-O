@@ -1,8 +1,8 @@
 {
-  "name": "fintrek-neon",
+  "name": "fintrek",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Gestão Financeira Pessoal",
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "pg": "^8.11.3"
   }
 }

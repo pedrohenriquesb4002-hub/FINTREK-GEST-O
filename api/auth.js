@@ -1,85 +1,68 @@
-// api/auth.js — Login e cadastro de usuários
-import { neon } from '@neondatabase/serverless';
-import crypto from 'crypto';
+// api/auth.js — Login e Cadastro
+const { Pool } = require('pg');
+const crypto   = require('crypto');
 
-// ── helpers ──────────────────────────────────────────────
+const pool = new Pool({ connectionString: process.env.POSTGRES_URL, ssl: { rejectUnauthorized: false } });
 
-function hashPassword(pass) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(pass, salt, 64).toString('hex');
-  return `${salt}:${hash}`;
+function hashPass(pass) {
+  return crypto.createHash('sha256').update(pass + 'fintrek_salt_2025').digest('hex');
 }
 
-function verifyPassword(pass, stored) {
-  try {
-    const [salt, hash] = stored.split(':');
-    const attempt = crypto.scryptSync(pass, salt, 64).toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(attempt, 'hex'), Buffer.from(hash, 'hex'));
-  } catch { return false; }
+function makeToken() {
+  return crypto.randomBytes(32).toString('hex');
 }
 
-export function makeToken(userId) {
-  const payload = `${userId}:${Date.now()}`;
-  const b64 = Buffer.from(payload).toString('base64url');
-  const sig = crypto.createHmac('sha256', process.env.TOKEN_SECRET).update(b64).digest('hex');
-  return `${b64}.${sig}`;
-}
-
-export function verifyToken(token) {
-  try {
-    const [b64, sig] = (token || '').split('.');
-    const expected = crypto.createHmac('sha256', process.env.TOKEN_SECRET).update(b64).digest('hex');
-    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return null;
-    const [userId] = Buffer.from(b64, 'base64url').toString().split(':');
-    return userId || null;
-  } catch { return null; }
-}
-
-// ── handler ──────────────────────────────────────────────
-
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
+  // Permite chamadas do seu site
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Method not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, err: 'Método não permitido' });
 
-  const sql = neon(process.env.DATABASE_URL);
-  const { action, email, pass, nome } = req.body || {};
+  const { action, nome, email, pass } = req.body;
 
-  // ── LOGIN ─────────────────────────────────────────────
-  if (action === 'login') {
-    if (!email || !pass) return res.json({ ok: false, err: 'Preencha email e senha.' });
+  if (!email || !pass) return res.json({ ok: false, err: 'Email e senha obrigatórios.' });
 
-    const rows = await sql`SELECT * FROM users WHERE email = ${email.toLowerCase().trim()}`;
-    if (!rows.length) return res.json({ ok: false, err: 'Email não encontrado.' });
+  const client = await pool.connect();
+  try {
+    // ── CADASTRO ──
+    if (action === 'register') {
+      if (!nome) return res.json({ ok: false, err: 'Nome obrigatório.' });
+      if (pass.length < 6) return res.json({ ok: false, err: 'Senha deve ter pelo menos 6 caracteres.' });
 
-    const user = rows[0];
-    if (!verifyPassword(pass, user.password_hash))
-      return res.json({ ok: false, err: 'Senha incorreta.' });
+      const exists = await client.query('SELECT id FROM ft_users WHERE email = $1', [email]);
+      if (exists.rows.length > 0) return res.json({ ok: false, err: 'Este email já está cadastrado.' });
 
-    const token = makeToken(user.id);
-    return res.json({ ok: true, token, user: { id: user.id, nome: user.nome, email: user.email } });
+      const result = await client.query(
+        'INSERT INTO ft_users (nome, email, pass_hash) VALUES ($1, $2, $3) RETURNING id, nome, email',
+        [nome, email, hashPass(pass)]
+      );
+      const user  = result.rows[0];
+      const token = makeToken();
+      await client.query('INSERT INTO ft_sessions (token, user_id) VALUES ($1, $2)', [token, user.id]);
+      return res.json({ ok: true, user, token });
+    }
+
+    // ── LOGIN ──
+    if (action === 'login') {
+      const result = await client.query('SELECT * FROM ft_users WHERE email = $1', [email]);
+      if (!result.rows.length) return res.json({ ok: false, err: 'Email não encontrado.' });
+
+      const user = result.rows[0];
+      if (user.pass_hash !== hashPass(pass)) return res.json({ ok: false, err: 'Senha incorreta.' });
+
+      const token = makeToken();
+      await client.query('INSERT INTO ft_sessions (token, user_id) VALUES ($1, $2)', [token, user.id]);
+      return res.json({ ok: true, user: { id: user.id, nome: user.nome, email: user.email }, token });
+    }
+
+    return res.json({ ok: false, err: 'Ação inválida.' });
+
+  } catch (err) {
+    console.error('Auth error:', err);
+    return res.status(500).json({ ok: false, err: 'Erro interno do servidor.' });
+  } finally {
+    client.release();
   }
-
-  // ── CADASTRO ──────────────────────────────────────────
-  if (action === 'register') {
-    if (!nome || !email || !pass)
-      return res.json({ ok: false, err: 'Preencha todos os campos.' });
-    if (pass.length < 6)
-      return res.json({ ok: false, err: 'Senha precisa ter no mínimo 6 caracteres.' });
-
-    const normalEmail = email.toLowerCase().trim();
-    const exists = await sql`SELECT id FROM users WHERE email = ${normalEmail}`;
-    if (exists.length) return res.json({ ok: false, err: 'Este email já está cadastrado.' });
-
-    const id = 'u_' + crypto.randomBytes(8).toString('hex');
-    const password_hash = hashPassword(pass);
-    await sql`INSERT INTO users (id, nome, email, password_hash) VALUES (${id}, ${nome.trim()}, ${normalEmail}, ${password_hash})`;
-
-    const token = makeToken(id);
-    return res.json({ ok: true, token, user: { id, nome: nome.trim(), email: normalEmail } });
-  }
-
-  return res.json({ ok: false, err: 'Ação inválida.' });
-}
+};
