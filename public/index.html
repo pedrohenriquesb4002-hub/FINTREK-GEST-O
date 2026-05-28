@@ -1079,10 +1079,18 @@ async function authLogin(){
 
     errEl.textContent = '';
 
-  }catch(err){
-    console.error(err);
-    errEl.textContent = 'Erro de conexão com servidor.';
-  }
+  }catch (err) {
+
+  console.error('AUTH ERROR COMPLETO:', err);
+
+  return res.status(500).json({
+    ok: false,
+    err: err.message,
+    detail: err.detail || null,
+    stack: err.stack || null
+  });
+
+}
 }
 
 async function authRegister() {
