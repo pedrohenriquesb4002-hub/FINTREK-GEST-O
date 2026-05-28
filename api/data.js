@@ -1,7 +1,7 @@
 // api/data.js — Salvar, carregar e deletar dados do usuário
 const { Pool } = require('pg');
 
-const pool = new Pool({ connectionString: process.env.POSTGRES_URL, ssl: { rejectUnauthorized: false } });
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 async function getUserFromToken(client, token) {
   if (!token) return null;
