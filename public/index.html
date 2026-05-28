@@ -2021,6 +2021,7 @@ function linkTxToConta(txId, key) {
   renderContasPage();
   showToast(`✓ R$ ${fmt(t.val)} descontado de ${c.nome}`);
 }
+function openContaModal(){ document.getElementById('modal-conta').classList.add('open'); }
 function closeContaModal(){document.getElementById('modal-conta').classList.remove('open');}
 function saveConta(){
   const nome=document.getElementById('c-nome').value.trim();
