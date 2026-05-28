@@ -65,4 +65,21 @@ module.exports = async (req, res) => {
   } finally {
     client.release();
   }
+  export default async function handler(req, res){
+
+  if(req.method !== 'POST'){
+    return res.status(405).json({
+      error:'Método não permitido'
+    });
+  }
+
+  const { email, senha } = req.body;
+
+  // LOGIN AQUI
+
+  return res.status(200).json({
+    success:true,
+    token:'123'
+  });
+}
 };
