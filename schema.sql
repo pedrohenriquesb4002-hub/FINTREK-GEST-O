@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════
--- FINTREK — Schema Supabase PostgreSQL
+-- FINTREK — Schema Supabase PostgreSQL (v2 seguro)
 -- Abra o SQL Editor no painel do Supabase,
 -- cole tudo e clique em RUN.
 -- ═══════════════════════════════════════════════
@@ -19,21 +19,22 @@ CREATE TABLE ft_users (
   created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- Desabilita RLS (este app usa auth própria, não a do Supabase)
 ALTER TABLE ft_users DISABLE ROW LEVEL SECURITY;
 
 
--- ── Sessões (tokens de login) ────────────────────
+-- ── Sessões (tokens com expiração de 30 dias) ───
 CREATE TABLE ft_sessions (
   id         BIGSERIAL    PRIMARY KEY,
   token      TEXT         UNIQUE NOT NULL,
   user_id    BIGINT       NOT NULL REFERENCES ft_users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ  NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
   created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 
 ALTER TABLE ft_sessions DISABLE ROW LEVEL SECURITY;
 
-CREATE INDEX idx_ft_sessions_token ON ft_sessions(token);
+CREATE INDEX idx_ft_sessions_token      ON ft_sessions(token);
+CREATE INDEX idx_ft_sessions_expires_at ON ft_sessions(expires_at);
 
 
 -- ── Dados chave-valor por usuário ────────────────
@@ -48,3 +49,9 @@ CREATE TABLE ft_data (
 ALTER TABLE ft_data DISABLE ROW LEVEL SECURITY;
 
 CREATE INDEX idx_ft_data_uid ON ft_data(user_id);
+
+
+-- ── Limpeza automática de sessões expiradas ──────
+-- Cria um job via pg_cron (disponível no Supabase):
+-- SELECT cron.schedule('limpar-sessoes', '0 3 * * *',
+--   $$DELETE FROM ft_sessions WHERE expires_at < NOW()$$);
